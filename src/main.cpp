@@ -278,7 +278,7 @@ int main() {
 			
 			//Go straight along the lanes using frenet coordinates path planner variant
 			if (pathVariant == "go_straight_frenet_spline"){
-
+				
 			}	
 			
 			//Go in circles path planner variant

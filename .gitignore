@@ -3,4 +3,5 @@ build
 .editorconfig
 .DS_Store
 myrun.sh
+build_run.sh
 readme_local.txt
