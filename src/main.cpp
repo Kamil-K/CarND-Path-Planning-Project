@@ -228,6 +228,9 @@ int main() {
           	// Previous path data given to the Planner
           	auto previous_path_x = j[1]["previous_path_x"];
           	auto previous_path_y = j[1]["previous_path_y"];
+			
+			int previous_size = previous_path_x.size();
+			
           	// Previous path's end s and d values 
           	double end_path_s = j[1]["end_path_s"];
           	double end_path_d = j[1]["end_path_d"];
@@ -239,19 +242,24 @@ int main() {
 
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
-
+			
+			double target_speed_mph = 49.5; //mph
+			double target_speed = target_speed_mph * 0.44704; //conversion to meters per second  
+			double number_path_points = 50;  
+			int laneID = 1;		//include lane ID - 0, 1 or 2
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
 			
 			//string pathVariant = "go_straight";
-			string pathVariant = "go_straight_frenet";
-			//string pathVariant = "go_straight_frenet_spline";
+			//string pathVariant = "go_straight_frenet";
+			//string pathVariant = "go_straight_frenet_spline";	//this variant implementation not finished (does not work)
 			//string pathVariant = "go_in_circles";
+			string pathVariant = "keep_lane_spline";
 			
 			//Go straight path planner variant
 			if (pathVariant == "go_straight"){
 				double dist_inc = 0.5;
-				for(int i = 0; i < 50; i++)
+				for(int i = 0; i < number_path_points; i++)
 				{
 					  next_x_vals.push_back(car_x+(dist_inc*i)*cos(deg2rad(car_yaw)));
 					  next_y_vals.push_back(car_y+(dist_inc*i)*sin(deg2rad(car_yaw)));
@@ -264,7 +272,7 @@ int main() {
 				double next_s_vals;
 				double next_d_vals;
 				vector<double> xy;
-				for(int i = 0; i < 50; i++)
+				for(int i = 0; i < number_path_points; i++)
 				{
 					next_s_vals = car_s+(i+1)*dist_inc;
 					next_d_vals = 2;
@@ -278,7 +286,33 @@ int main() {
 			
 			//Go straight along the lanes using frenet coordinates path planner variant
 			if (pathVariant == "go_straight_frenet_spline"){
+				double dist_inc = target_speed / number_path_points;
+				double next_s_vals;
+				double next_d_vals;
+				vector<double> xy;
+				vector<double> x;
+				vector<double> y;
+				for(int i = 0; i < number_path_points; i++)
+				{
+					next_s_vals = car_s+(i+1)*dist_inc;
+					next_d_vals = 2;
+					
+					xy = getXY(next_s_vals, next_d_vals, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+					
+					x.push_back(xy[0]);
+					y.push_back(xy[1]);
+				}
 				
+				spline s;
+				s.set_points(x,y);
+				
+				for(int i = 0; i < number_path_points; i++)
+				{
+					std::cout << "spline at id " << i << " for point x: " << x[i] << " is " << s(x[i]) << endl;
+					
+					next_x_vals.push_back(x[i]);
+					next_y_vals.push_back(s(x[i]));
+				}
 			}	
 			
 			//Go in circles path planner variant
@@ -286,15 +320,14 @@ int main() {
 				double pos_x;
 				double pos_y;
 				double angle;
-				int path_size = previous_path_x.size();
-
-				for(int i = 0; i < path_size; i++)
+				
+				for(int i = 0; i < previous_size; i++)
 				{
 				  next_x_vals.push_back(previous_path_x[i]);
 				  next_y_vals.push_back(previous_path_y[i]);
 				}
 
-				if(path_size == 0)
+				if(previous_size == 0)
 				{
 				  pos_x = car_x;
 				  pos_y = car_y;
@@ -302,16 +335,16 @@ int main() {
 				}
 				else
 				{
-				  pos_x = previous_path_x[path_size-1];
-				  pos_y = previous_path_y[path_size-1];
+				  pos_x = previous_path_x[previous_size-1];
+				  pos_y = previous_path_y[previous_size-1];
 
-				  double pos_x2 = previous_path_x[path_size-2];
-				  double pos_y2 = previous_path_y[path_size-2];
+				  double pos_x2 = previous_path_x[previous_size-2];
+				  double pos_y2 = previous_path_y[previous_size-2];
 				  angle = atan2(pos_y-pos_y2,pos_x-pos_x2);
 				}
 
 				double dist_inc = 0.5;
-				for(int i = 0; i < 50-path_size; i++)
+				for(int i = 0; i < 50-previous_size; i++)
 				{    
 				  next_x_vals.push_back(pos_x+(dist_inc)*cos(angle+(i+1)*(pi()/100)));
 				  next_y_vals.push_back(pos_y+(dist_inc)*sin(angle+(i+1)*(pi()/100)));
@@ -320,6 +353,98 @@ int main() {
 				}
 			}
 			
+			//Go straight path planner variant
+			if (pathVariant == "keep_lane_spline"){
+				
+				//equally spaced waypoints to then fit a spline to them and create a smooth path
+				vector<double> points_x;
+				vector<double> points_y;
+				
+				int number_waypoints = 3;
+				double distance_waypoints = 50;
+				double lane_width = 4;
+				double sim_refresh_rate = 0.02;
+	
+				//reference of x, y and yaw
+				double reference_x = car_x;
+				double reference_y = car_y;
+				double reference_yaw = deg2rad(car_yaw);
+				
+				if(previous_size < 2){
+					double previous_car_x = car_x - cos(car_yaw);
+					double previous_car_y = car_y - sin(car_yaw);
+					
+					points_x.push_back(previous_car_x);
+					points_x.push_back(car_x);
+					
+					points_y.push_back(previous_car_y);
+					points_y.push_back(car_y);
+				}
+				else {
+					reference_x = previous_path_x[previous_size-1];
+					reference_y = previous_path_y[previous_size-1];
+					
+					double reference_x_previous = previous_path_x[previous_size-2];
+					double reference_y_previous = previous_path_y[previous_size-2];
+					reference_yaw = atan2(reference_y-reference_y_previous, reference_x-reference_x_previous);
+					
+					points_x.push_back(reference_x_previous);
+					points_x.push_back(reference_x);
+					
+					points_y.push_back(reference_y_previous);
+					points_y.push_back(reference_y);					
+				}
+				
+				
+				//build few additional points to which the spline will be fit
+				for(int i = 0; i < number_waypoints; i++){
+					vector<double> waypoint = getXY(car_s+(i+1)*distance_waypoints, lane_width*(0.5+laneID), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+					points_x.push_back(waypoint[0]);
+					points_y.push_back(waypoint[1]);
+				}
+				
+				//reference frame transformation to the car coordinate system
+				for(int i = 0; i < points_x.size(); i++){
+					double shift_x = points_x[i] - reference_x;
+					double shift_y = points_y[i] - reference_y;
+					points_x[i] = (shift_x * cos(0-reference_yaw) - shift_y * sin(0-reference_yaw));
+					points_y[i] = (shift_x * sin(0-reference_yaw) + shift_y * cos(0-reference_yaw));
+				}
+				
+				spline s;
+				s.set_points(points_x, points_y);		
+				
+				double target_x = 40.0;
+				double target_y = s(target_x);
+				double target_dist = sqrt(target_x*target_x+target_y*target_y);
+				double x_add_on = 0;
+				
+				for(int i = 0; i < number_path_points; i++){
+					if (i < previous_size){
+						next_x_vals.push_back(previous_path_x[i]);
+						next_y_vals.push_back(previous_path_y[i]);
+					}
+					else {
+						double N = target_dist/(sim_refresh_rate*target_speed);
+						double x_point = x_add_on + target_x/N;
+						double y_point = s(x_point);
+						
+						x_add_on = x_point;
+						
+						double x_reference = x_point;
+						double y_reference = y_point;
+						
+						x_point = x_reference*cos(reference_yaw) - y_reference*sin(reference_yaw);
+						y_point = x_reference*sin(reference_yaw) + y_reference*cos(reference_yaw);
+						
+						x_point += reference_x;
+						y_point += reference_y;
+						
+						next_x_vals.push_back(x_point);
+						next_y_vals.push_back(y_point);
+					}
+				}
+			}
 			
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;
@@ -339,8 +464,7 @@ int main() {
   });
 
   // We don't need this since we're not using HTTP but if it's removed the
-  // program
-  // doesn't compile :-(
+  // program doesn't compile :-(
   h.onHttpRequest([](uWS::HttpResponse *res, uWS::HttpRequest req, char *data,
                      size_t, size_t) {
     const std::string s = "<h1>Hello world!</h1>";
