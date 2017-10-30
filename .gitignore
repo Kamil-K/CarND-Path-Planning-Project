@@ -1,0 +1,6 @@
+.vscode
+build
+.editorconfig
+.DS_Store
+myrun.sh
+readme_local.txt
