@@ -112,7 +112,7 @@ vector<double> getFrenet(double x, double y, double theta, const vector<double> 
 	double center_y = 2000-maps_y[prev_wp];
 	double centerToPos = distance(center_x,center_y,x_x,x_y);
 	double centerToRef = distance(center_x,center_y,proj_x,proj_y);
-
+	
 	if(centerToPos <= centerToRef)
 	{
 		frenet_d *= -1;
@@ -175,6 +175,7 @@ int main() {
   double target_speed_mph = 0.0; //target speed at the begining [mph]
   double target_speed = target_speed_mph * 0.44704; //conversion to meters per second  
   int laneID = 1;		//include lane ID - 0, 1 or 2
+  int count_its_inLane = 0;	//count iterations spent in lane
   
   ifstream in_map_(map_file_.c_str(), ifstream::in);
 
@@ -198,7 +199,7 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
   
-  h.onMessage([&laneID, &target_speed, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  h.onMessage([&count_its_inLane, &laneID, &target_speed, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -244,10 +245,11 @@ int main() {
 			double speed_limit = 49;
 			double lead_vehicle_speed = 49;
 			int number_waypoints = 3;
-			double distance_waypoints = 30;
+			double distance_waypoints = 40;
 			double lane_width = 4;
 			double sim_refresh_rate = 0.02;
 			int number_lanes = 3;
+			double min_keep_lane_time = 25; //minimal number of iterations to stay in a lane
 							
 			if (previous_size > 0){
 				car_s = end_path_s;
@@ -289,14 +291,21 @@ int main() {
 			
 			bool too_close = false;
 			
+			//int it_in_lane = 0;
+			
+			bool keep_lane = true;
+			
 			//keep right lane when possible & prioritize taking over vehicles on the left when possible
 			if (laneID == 2){
 				if (freeLaneAhead[2] == true){
-					laneID = 2;
+					laneID = 2;					
 				}
 				else if (freeLaneAhead[2] == false){
 					if ((freeLaneAhead[1] == true) && (freeLaneBehind[1] == true)){
-						laneID = 1;
+						if (count_its_inLane >= min_keep_lane_time){
+							keep_lane = false;
+							laneID = 1;							
+						}
 					}
 					else {
 						too_close = true;
@@ -306,7 +315,10 @@ int main() {
 			else if (laneID == 1){
 				if (freeLaneAhead[1] == true){
 					if ((freeLaneAhead[2] == true) && (freeLaneBehind[2] == true)){
-						laneID = 2;
+						if (count_its_inLane >= min_keep_lane_time){
+							keep_lane = false;
+							laneID = 2;						
+						}
 					}
 					else {
 						laneID = 1;
@@ -314,11 +326,17 @@ int main() {
 				}
 				else if (freeLaneAhead[1] == false){
 					if ((freeLaneAhead[0] == true) && (freeLaneBehind[0] == true)) {
-						laneID = 0;
+						if (count_its_inLane >= min_keep_lane_time){
+							keep_lane = false;
+							laneID = 0;
+						}
 					}
 					else{
 						if ((freeLaneAhead[2] == true) && (freeLaneBehind[2] == true)) {
-							laneID = 2;
+							if (count_its_inLane >= min_keep_lane_time){
+								keep_lane = false;
+								laneID = 2;
+							}								
 						}
 						else {
 							too_close = true;
@@ -329,7 +347,10 @@ int main() {
 			else if (laneID == 0){
 				if (freeLaneAhead[0] == true) {
 					if ((freeLaneAhead[1] == true) && (freeLaneBehind[1] == true)){
-						laneID = 1;
+						if (count_its_inLane >= min_keep_lane_time){
+							keep_lane = false;
+							laneID = 1;
+						}
 					}
 					else {
 						laneID = 0;
@@ -337,7 +358,10 @@ int main() {
 				}
 				else if (freeLaneAhead[0] == false) {
 					if ((freeLaneAhead[1] == true) && (freeLaneBehind[1] == true)) {
-						laneID = 1;
+						if (count_its_inLane >= min_keep_lane_time){
+							keep_lane = false;
+							laneID = 1;							
+						}
 					}
 					else {
 						too_close = true;
@@ -345,20 +369,28 @@ int main() {
 				}
 			}
 			
+			if (keep_lane){
+				count_its_inLane += 1;
+			}
+			else {
+				count_its_inLane = 0;
+			}
+			cout << count_its_inLane << endl;
+			
 			if (too_close){
 				if (target_speed < lead_vehicle_speed){
-					target_speed += 0.27;
+					target_speed += 0.2;
 				}
 				else{
-					target_speed -= 0.27;
+					target_speed -= 0.2;
 				}
 			}
 			else if (target_speed < speed_limit) {
 				if (target_speed < 20.0) {
-					target_speed += 1;
+					target_speed += 1.2;
 				}
 				else {
-					target_speed += 0.4;
+					target_speed += 0.2;
 				}
 			}
 			
