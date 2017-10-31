@@ -289,8 +289,7 @@ int main() {
 			
 			bool too_close = false;
 			
-			//stay on the most right lane when possible & never take over on the right hand side
-			//rules applied in this path planner are part of the - StVO German Autobahn driving rules
+			//keep right lane when possible & prioritize taking over vehicles on the left when possible
 			if (laneID == 2){
 				if (freeLaneAhead[2] == true){
 					laneID = 2;
@@ -318,7 +317,12 @@ int main() {
 						laneID = 0;
 					}
 					else{
-						too_close = true;
+						if ((freeLaneAhead[2] == true) && (freeLaneBehind[2] == true)) {
+							laneID = 2;
+						}
+						else {
+							too_close = true;
+						}
 					}
 				}
 			}
@@ -332,20 +336,30 @@ int main() {
 					}
 				}
 				else if (freeLaneAhead[0] == false) {
-					too_close = true;
+					if ((freeLaneAhead[1] == true) && (freeLaneBehind[1] == true)) {
+						laneID = 1;
+					}
+					else {
+						too_close = true;
+					}
 				}
 			}
 			
 			if (too_close){
 				if (target_speed < lead_vehicle_speed){
-					target_speed += 0.3;
+					target_speed += 0.27;
 				}
 				else{
-					target_speed -= 0.3;
+					target_speed -= 0.27;
 				}
 			}
-			else if (target_speed < speed_limit){
-				target_speed += 0.4;
+			else if (target_speed < speed_limit) {
+				if (target_speed < 20.0) {
+					target_speed += 1;
+				}
+				else {
+					target_speed += 0.4;
+				}
 			}
 			
 			double target_speed_met_per_sec =  target_speed*0.44704;	//conversion from mph to meters per second
