@@ -175,7 +175,11 @@ int main() {
   string map_file_ = "../data/highway_map.csv";
   // The max s value before wrapping around the track back to 0
   double max_s = 6945.554;
-
+  
+  double target_speed_mph = 0.0; //target speed at the begining [mph]
+  double target_speed = target_speed_mph * 0.44704; //conversion to meters per second  
+  int laneID = 1;		//include lane ID - 0, 1 or 2
+  
   ifstream in_map_(map_file_.c_str(), ifstream::in);
 
   string line;
@@ -197,9 +201,8 @@ int main() {
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
   }
-
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
-                     uWS::OpCode opCode) {
+  
+  h.onMessage([&laneID, &target_speed, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -228,7 +231,6 @@ int main() {
           	// Previous path data given to the Planner
           	auto previous_path_x = j[1]["previous_path_x"];
           	auto previous_path_y = j[1]["previous_path_y"];
-			
 			int previous_size = previous_path_x.size();
 			
           	// Previous path's end s and d values 
@@ -237,212 +239,174 @@ int main() {
 
           	// Sensor Fusion Data, a list of all other cars on the same side of the road.
           	auto sensor_fusion = j[1]["sensor_fusion"];
-
+			
           	json msgJson;
 
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
 			
-			double target_speed_mph = 49.5; //mph
-			double target_speed = target_speed_mph * 0.44704; //conversion to meters per second  
 			double number_path_points = 50;  
-			int laneID = 1;		//include lane ID - 0, 1 or 2
-
-          	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-			
-			//string pathVariant = "go_straight";
-			//string pathVariant = "go_straight_frenet";
-			//string pathVariant = "go_straight_frenet_spline";	//this variant implementation not finished (does not work)
-			//string pathVariant = "go_in_circles";
-			string pathVariant = "keep_lane_spline";
-			
-			//Go straight path planner variant
-			if (pathVariant == "go_straight"){
-				double dist_inc = 0.5;
-				for(int i = 0; i < number_path_points; i++)
-				{
-					  next_x_vals.push_back(car_x+(dist_inc*i)*cos(deg2rad(car_yaw)));
-					  next_y_vals.push_back(car_y+(dist_inc*i)*sin(deg2rad(car_yaw)));
-				}
-			}	
-			
-			//Go straight along the lanes using frenet coordinates path planner variant
-			if (pathVariant == "go_straight_frenet"){
-				double dist_inc = 0.5;
-				double next_s_vals;
-				double next_d_vals;
-				vector<double> xy;
-				for(int i = 0; i < number_path_points; i++)
-				{
-					next_s_vals = car_s+(i+1)*dist_inc;
-					next_d_vals = 2;
-					
-					xy = getXY(next_s_vals, next_d_vals, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-					
-					next_x_vals.push_back(xy[0]);
-					next_y_vals.push_back(xy[1]);
-				}
-			}	
-			
-			//Go straight along the lanes using frenet coordinates path planner variant
-			if (pathVariant == "go_straight_frenet_spline"){
-				double dist_inc = target_speed / number_path_points;
-				double next_s_vals;
-				double next_d_vals;
-				vector<double> xy;
-				vector<double> x;
-				vector<double> y;
-				for(int i = 0; i < number_path_points; i++)
-				{
-					next_s_vals = car_s+(i+1)*dist_inc;
-					next_d_vals = 2;
-					
-					xy = getXY(next_s_vals, next_d_vals, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-					
-					x.push_back(xy[0]);
-					y.push_back(xy[1]);
-				}
-				
-				spline s;
-				s.set_points(x,y);
-				
-				for(int i = 0; i < number_path_points; i++)
-				{
-					std::cout << "spline at id " << i << " for point x: " << x[i] << " is " << s(x[i]) << endl;
-					
-					next_x_vals.push_back(x[i]);
-					next_y_vals.push_back(s(x[i]));
-				}
-			}	
-			
-			//Go in circles path planner variant
-			if (pathVariant == "go_in_circles"){
-				double pos_x;
-				double pos_y;
-				double angle;
-				
-				for(int i = 0; i < previous_size; i++)
-				{
-				  next_x_vals.push_back(previous_path_x[i]);
-				  next_y_vals.push_back(previous_path_y[i]);
-				}
-
-				if(previous_size == 0)
-				{
-				  pos_x = car_x;
-				  pos_y = car_y;
-				  angle = deg2rad(car_yaw);
-				}
-				else
-				{
-				  pos_x = previous_path_x[previous_size-1];
-				  pos_y = previous_path_y[previous_size-1];
-
-				  double pos_x2 = previous_path_x[previous_size-2];
-				  double pos_y2 = previous_path_y[previous_size-2];
-				  angle = atan2(pos_y-pos_y2,pos_x-pos_x2);
-				}
-
-				double dist_inc = 0.5;
-				for(int i = 0; i < 50-previous_size; i++)
-				{    
-				  next_x_vals.push_back(pos_x+(dist_inc)*cos(angle+(i+1)*(pi()/100)));
-				  next_y_vals.push_back(pos_y+(dist_inc)*sin(angle+(i+1)*(pi()/100)));
-				  pos_x += (dist_inc)*cos(angle+(i+1)*(pi()/100));
-				  pos_y += (dist_inc)*sin(angle+(i+1)*(pi()/100));
-				}
+			double proximity_limit = 40; //meters
+			double proximity_limit_behind = 20; //meters
+			double speed_limit = 49;
+			int number_waypoints = 3;
+			double distance_waypoints = 40;
+			double lane_width = 4;
+			double sim_refresh_rate = 0.02;
+			int number_lanes = 3;
+							
+			if (previous_size > 0){
+				car_s = end_path_s;
 			}
 			
-			//Go straight path planner variant
-			if (pathVariant == "keep_lane_spline"){
+			vector<bool> freeLaneAhead;
+			vector<bool> freeLaneBehind;
+						
+			for (int it_lane = 0; it_lane < number_lanes; it_lane++){	
+				bool it_freeLaneAhead = true;			
+				bool it_freeLaneBehind = true;
+				for (int it_vehicle = 0; it_vehicle < sensor_fusion.size(); it_vehicle++){
+					float vehicle_d = sensor_fusion[it_vehicle][6];
+					if (vehicle_d < (lane_width*(it_lane+1)) && vehicle_d > (lane_width*it_lane)){
+						double vx = sensor_fusion[it_vehicle][3];
+						double vy = sensor_fusion[it_vehicle][4];	
+						double check_speed = sqrt(vx*vx + vy*vy);					
+						double check_car_s = sensor_fusion[it_vehicle][5];
+						check_car_s += (double)previous_size * sim_refresh_rate * check_speed;
+						if ((check_car_s > car_s) && ((check_car_s-car_s) < proximity_limit)){
+							it_freeLaneAhead = false;
+						}
+						/*
+						else if ((check_car_s < car_s) && ((check_car_s-car_s) > proximity_limit_behind)){
+							it_freeLaneBehind = false;
+						}
+						*/
+					}
+				}
+				freeLaneAhead.push_back(it_freeLaneAhead);
+				//freeLaneBehind.push_back(it_freeLaneBehind);
+			}
+			
+			bool too_close = false;
+			
+			//stay on the most right lane when possible
+			/*
+			if ((freeLaneAhead[2] == true) && (freeLaneBehind[2] == true)){
+				laneID = 2;
+			}
+			else if ((freeLaneAhead[1] == true) && (freeLaneBehind[1] == true) && (freeLaneAhead[2] == false)) {
+				laneID = 1;
+			}
+			else if ((freeLaneAhead[1] == false) && (freeLaneBehind[0] == true) && (freeLaneAhead[2] == false)) {
+				laneID = 0;
+			}
+			else {
+				too_close = true;
+			}
+			*/
+			if (freeLaneAhead[2] == true) {
+				laneID = 2;
+			}
+			else if ((freeLaneAhead[1] == true) && (freeLaneAhead[2] == false)) {
+				laneID = 1;
+			}
+			else if ((freeLaneAhead[1] == false) && (freeLaneAhead[2] == false)) {
+				laneID = 0;
+			}
+			else {
+				too_close = true;
+			}
 				
-				//equally spaced waypoints to then fit a spline to them and create a smooth path
-				vector<double> points_x;
-				vector<double> points_y;
+			if (too_close){
+				target_speed -= 0.4;
+			}
+			else if (target_speed < speed_limit){
+				target_speed += 0.4;
+			}
+			
+			double target_speed_met_per_sec =  target_speed*0.44704;	//conversion from mph to meters per second
+			
+			//equally spaced waypoints to then fit a spline to them and create a smooth path
+			vector<double> points_x;
+			vector<double> points_y;
+			
+			//reference of x, y and yaw
+			double reference_x = car_x;
+			double reference_y = car_y;
+			double reference_yaw = deg2rad(car_yaw);
+			
+			if(previous_size < 2){
+				double previous_car_x = car_x - cos(car_yaw);
+				double previous_car_y = car_y - sin(car_yaw);
 				
-				int number_waypoints = 3;
-				double distance_waypoints = 50;
-				double lane_width = 4;
-				double sim_refresh_rate = 0.02;
-	
-				//reference of x, y and yaw
-				double reference_x = car_x;
-				double reference_y = car_y;
-				double reference_yaw = deg2rad(car_yaw);
+				points_x.push_back(previous_car_x);
+				points_x.push_back(car_x);
 				
-				if(previous_size < 2){
-					double previous_car_x = car_x - cos(car_yaw);
-					double previous_car_y = car_y - sin(car_yaw);
-					
-					points_x.push_back(previous_car_x);
-					points_x.push_back(car_x);
-					
-					points_y.push_back(previous_car_y);
-					points_y.push_back(car_y);
+				points_y.push_back(previous_car_y);
+				points_y.push_back(car_y);
+			}
+			else {
+				reference_x = previous_path_x[previous_size-1];
+				reference_y = previous_path_y[previous_size-1];
+				
+				double reference_x_previous = previous_path_x[previous_size-2];
+				double reference_y_previous = previous_path_y[previous_size-2];
+				reference_yaw = atan2(reference_y-reference_y_previous, reference_x-reference_x_previous);
+				
+				points_x.push_back(reference_x_previous);
+				points_x.push_back(reference_x);
+				
+				points_y.push_back(reference_y_previous);
+				points_y.push_back(reference_y);					
+			}
+			
+			
+			//build few additional points to which the spline will be fit
+			for(int i = 0; i < number_waypoints; i++){
+				vector<double> waypoint = getXY(car_s+(i+1)*distance_waypoints, lane_width*(0.5+laneID), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+				points_x.push_back(waypoint[0]);
+				points_y.push_back(waypoint[1]);
+			}
+			
+			//reference frame transformation to the car coordinate system
+			for(int i = 0; i < points_x.size(); i++){
+				double shift_x = points_x[i] - reference_x;
+				double shift_y = points_y[i] - reference_y;
+				points_x[i] = (shift_x * cos(0-reference_yaw) - shift_y * sin(0-reference_yaw));
+				points_y[i] = (shift_x * sin(0-reference_yaw) + shift_y * cos(0-reference_yaw));
+			}
+			
+			spline s;
+			s.set_points(points_x, points_y);		
+			
+			double target_x = 40.0;
+			double target_y = s(target_x);
+			double target_dist = sqrt(target_x*target_x+target_y*target_y);
+			double x_add_on = 0;
+			
+			for(int i = 0; i < number_path_points; i++){
+				if (i < previous_size){
+					next_x_vals.push_back(previous_path_x[i]);
+					next_y_vals.push_back(previous_path_y[i]);
 				}
 				else {
-					reference_x = previous_path_x[previous_size-1];
-					reference_y = previous_path_y[previous_size-1];
+					double N = target_dist/(sim_refresh_rate*target_speed_met_per_sec);
+					double x_point = x_add_on + target_x/N;
+					double y_point = s(x_point);
 					
-					double reference_x_previous = previous_path_x[previous_size-2];
-					double reference_y_previous = previous_path_y[previous_size-2];
-					reference_yaw = atan2(reference_y-reference_y_previous, reference_x-reference_x_previous);
+					x_add_on = x_point;
 					
-					points_x.push_back(reference_x_previous);
-					points_x.push_back(reference_x);
+					double x_reference = x_point;
+					double y_reference = y_point;
 					
-					points_y.push_back(reference_y_previous);
-					points_y.push_back(reference_y);					
-				}
-				
-				
-				//build few additional points to which the spline will be fit
-				for(int i = 0; i < number_waypoints; i++){
-					vector<double> waypoint = getXY(car_s+(i+1)*distance_waypoints, lane_width*(0.5+laneID), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-					points_x.push_back(waypoint[0]);
-					points_y.push_back(waypoint[1]);
-				}
-				
-				//reference frame transformation to the car coordinate system
-				for(int i = 0; i < points_x.size(); i++){
-					double shift_x = points_x[i] - reference_x;
-					double shift_y = points_y[i] - reference_y;
-					points_x[i] = (shift_x * cos(0-reference_yaw) - shift_y * sin(0-reference_yaw));
-					points_y[i] = (shift_x * sin(0-reference_yaw) + shift_y * cos(0-reference_yaw));
-				}
-				
-				spline s;
-				s.set_points(points_x, points_y);		
-				
-				double target_x = 40.0;
-				double target_y = s(target_x);
-				double target_dist = sqrt(target_x*target_x+target_y*target_y);
-				double x_add_on = 0;
-				
-				for(int i = 0; i < number_path_points; i++){
-					if (i < previous_size){
-						next_x_vals.push_back(previous_path_x[i]);
-						next_y_vals.push_back(previous_path_y[i]);
-					}
-					else {
-						double N = target_dist/(sim_refresh_rate*target_speed);
-						double x_point = x_add_on + target_x/N;
-						double y_point = s(x_point);
-						
-						x_add_on = x_point;
-						
-						double x_reference = x_point;
-						double y_reference = y_point;
-						
-						x_point = x_reference*cos(reference_yaw) - y_reference*sin(reference_yaw);
-						y_point = x_reference*sin(reference_yaw) + y_reference*cos(reference_yaw);
-						
-						x_point += reference_x;
-						y_point += reference_y;
-						
-						next_x_vals.push_back(x_point);
-						next_y_vals.push_back(y_point);
-					}
+					x_point = x_reference*cos(reference_yaw) - y_reference*sin(reference_yaw);
+					y_point = x_reference*sin(reference_yaw) + y_reference*cos(reference_yaw);
+					
+					x_point += reference_x;
+					y_point += reference_y;
+					
+					next_x_vals.push_back(x_point);
+					next_y_vals.push_back(y_point);
 				}
 			}
 			
