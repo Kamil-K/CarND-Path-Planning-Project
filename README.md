@@ -6,8 +6,6 @@ Self-Driving Car Engineer Nanodegree Program
 
 Click [here](https://youtu.be/FjcHx42kIEs) or on the image below to go to the YouTube video<p>
 [![Path Planning Track Ride](https://img.youtube.com/vi/FjcHx42kIEs/0.jpg)](https://youtu.be/FjcHx42kIEs)
-
-![alt tex](https://github.com/Kamil-K/CarND-Path-Planning-Project/blob/master/pics/screenshot.PNG "Successful Run")
    
 ## Discussion
    
