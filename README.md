@@ -6,6 +6,8 @@ Self-Driving Car Engineer Nanodegree Program
 
 Click [here](https://youtu.be/FjcHx42kIEs) or on the image below to go to the YouTube video<p>
 [![Path Planning Track Ride](https://img.youtube.com/vi/FjcHx42kIEs/0.jpg)](https://youtu.be/FjcHx42kIEs)
+
+![alt tex](https://github.com/Kamil-K/CarND-Path-Planning-Project/blob/master/pics/screenshot.PNG "Successful Run")
    
 ## Discussion
    
@@ -162,4 +164,3 @@ still be compilable with cmake and make./
 ## How to write a README
 A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
 
-![alt tex](https://github.com/Kamil-K/CarND-Path-Planning-Project/blob/master/pics/screenshot.PNG "Successful Run")
