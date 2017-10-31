@@ -60,7 +60,6 @@ int ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vect
 	}
 
 	return closestWaypoint;
-
 }
 
 int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y)
@@ -81,7 +80,6 @@ int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x,
 	}
 
 	return closestWaypoint;
-
 }
 
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
@@ -130,7 +128,6 @@ vector<double> getFrenet(double x, double y, double theta, const vector<double> 
 	frenet_s += distance(0,0,proj_x,proj_y);
 
 	return {frenet_s,frenet_d};
-
 }
 
 // Transform from Frenet s,d coordinates to Cartesian x,y
@@ -158,7 +155,6 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 	double y = seg_y + d*sin(perp_heading);
 
 	return {x,y};
-
 }
 
 int main() {
@@ -241,16 +237,14 @@ int main() {
           	auto sensor_fusion = j[1]["sensor_fusion"];
 			
           	json msgJson;
-
-          	vector<double> next_x_vals;
-          	vector<double> next_y_vals;
 			
-			double number_path_points = 50;  
-			double proximity_limit = 40; //meters
-			double proximity_limit_behind = 20; //meters
+			double number_path_points = 60;  
+			double proximity_limit = 30; //meters
+			double proximity_limit_behind = 10; //meters
 			double speed_limit = 49;
+			double lead_vehicle_speed = 49;
 			int number_waypoints = 3;
-			double distance_waypoints = 40;
+			double distance_waypoints = 30;
 			double lane_width = 4;
 			double sim_refresh_rate = 0.02;
 			int number_lanes = 3;
@@ -258,9 +252,12 @@ int main() {
 			if (previous_size > 0){
 				car_s = end_path_s;
 			}
+				
+			vector<double> next_x_vals;
+          	vector<double> next_y_vals;
 			
 			vector<bool> freeLaneAhead;
-			vector<bool> freeLaneBehind;
+			vector<bool> freeLaneBehind;			
 						
 			for (int it_lane = 0; it_lane < number_lanes; it_lane++){	
 				bool it_freeLaneAhead = true;			
@@ -275,50 +272,77 @@ int main() {
 						check_car_s += (double)previous_size * sim_refresh_rate * check_speed;
 						if ((check_car_s > car_s) && ((check_car_s-car_s) < proximity_limit)){
 							it_freeLaneAhead = false;
+							//cout << "lane " << it_lane <<" vehicle " << it_vehicle << " ahead speed: " << check_speed << endl;
+							if (it_lane == laneID){
+								lead_vehicle_speed = check_speed;
+							}							
 						}
-						/*
-						else if ((check_car_s < car_s) && ((check_car_s-car_s) > proximity_limit_behind)){
+						else if ((check_car_s < car_s) && ((car_s-check_car_s) < proximity_limit_behind)){
 							it_freeLaneBehind = false;
+							//cout << "lane " << it_lane <<" vehicle " << it_vehicle << " behind speed: " << check_speed << endl;
 						}
-						*/
 					}
 				}
 				freeLaneAhead.push_back(it_freeLaneAhead);
-				//freeLaneBehind.push_back(it_freeLaneBehind);
+				freeLaneBehind.push_back(it_freeLaneBehind);
 			}
 			
 			bool too_close = false;
 			
-			//stay on the most right lane when possible
-			/*
-			if ((freeLaneAhead[2] == true) && (freeLaneBehind[2] == true)){
-				laneID = 2;
+			//stay on the most right lane when possible & never take over on the right hand side
+			//rules applied in this path planner are part of the - StVO German Autobahn driving rules
+			if (laneID == 2){
+				if (freeLaneAhead[2] == true){
+					laneID = 2;
+				}
+				else if (freeLaneAhead[2] == false){
+					if ((freeLaneAhead[1] == true) && (freeLaneBehind[1] == true)){
+						laneID = 1;
+					}
+					else {
+						too_close = true;
+					}
+				}
 			}
-			else if ((freeLaneAhead[1] == true) && (freeLaneBehind[1] == true) && (freeLaneAhead[2] == false)) {
-				laneID = 1;
+			else if (laneID == 1){
+				if (freeLaneAhead[1] == true){
+					if ((freeLaneAhead[2] == true) && (freeLaneBehind[2] == true)){
+						laneID = 2;
+					}
+					else {
+						laneID = 1;
+					}
+				}
+				else if (freeLaneAhead[1] == false){
+					if ((freeLaneAhead[0] == true) && (freeLaneBehind[0] == true)) {
+						laneID = 0;
+					}
+					else{
+						too_close = true;
+					}
+				}
 			}
-			else if ((freeLaneAhead[1] == false) && (freeLaneBehind[0] == true) && (freeLaneAhead[2] == false)) {
-				laneID = 0;
+			else if (laneID == 0){
+				if (freeLaneAhead[0] == true) {
+					if ((freeLaneAhead[1] == true) && (freeLaneBehind[1] == true)){
+						laneID = 1;
+					}
+					else {
+						laneID = 0;
+					}
+				}
+				else if (freeLaneAhead[0] == false) {
+					too_close = true;
+				}
 			}
-			else {
-				too_close = true;
-			}
-			*/
-			if (freeLaneAhead[2] == true) {
-				laneID = 2;
-			}
-			else if ((freeLaneAhead[1] == true) && (freeLaneAhead[2] == false)) {
-				laneID = 1;
-			}
-			else if ((freeLaneAhead[1] == false) && (freeLaneAhead[2] == false)) {
-				laneID = 0;
-			}
-			else {
-				too_close = true;
-			}
-				
+			
 			if (too_close){
-				target_speed -= 0.4;
+				if (target_speed < lead_vehicle_speed){
+					target_speed += 0.3;
+				}
+				else{
+					target_speed -= 0.3;
+				}
 			}
 			else if (target_speed < speed_limit){
 				target_speed += 0.4;
