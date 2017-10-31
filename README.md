@@ -4,6 +4,8 @@ Kamil Kaczmarczyk
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
 
+## YouTube Video
+
 Click [here](https://youtu.be/FjcHx42kIEs) or on the image below to go to the YouTube video<p>
 [![Path Planning Track Ride](https://img.youtube.com/vi/FjcHx42kIEs/0.jpg)](https://youtu.be/FjcHx42kIEs)
    
