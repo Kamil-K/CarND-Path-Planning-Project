@@ -260,7 +260,8 @@ int main() {
 			
 			vector<bool> freeLaneAhead;
 			vector<bool> freeLaneBehind;			
-						
+			
+			//Environment Perception based on Sensor Fusion data
 			for (int it_lane = 0; it_lane < number_lanes; it_lane++){	
 				bool it_freeLaneAhead = true;			
 				bool it_freeLaneBehind = true;
@@ -289,12 +290,10 @@ int main() {
 				freeLaneBehind.push_back(it_freeLaneBehind);
 			}
 			
-			bool too_close = false;
-			
-			//int it_in_lane = 0;
-			
+			bool too_close = false;			
 			bool keep_lane = true;
 			
+			//Behavior Planning part - Machine States implemented based on decision trees
 			//keep right lane when possible & prioritize taking over vehicles on the left when possible
 			if (laneID == 2){
 				if (freeLaneAhead[2] == true){
@@ -369,14 +368,16 @@ int main() {
 				}
 			}
 			
+			//time in lane control - to not jumpt two lanes at once
 			if (keep_lane){
 				count_its_inLane += 1;
 			}
 			else {
 				count_its_inLane = 0;
 			}
-			cout << count_its_inLane << endl;
+			//cout << count_its_inLane << endl;
 			
+			//speed control
 			if (too_close){
 				if (target_speed < lead_vehicle_speed){
 					target_speed += 0.2;

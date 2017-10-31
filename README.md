@@ -1,5 +1,27 @@
+Kamil Kaczmarczyk
+2017-10-31
+
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
+
+Click [here](https://youtu.be/FjcHx42kIEs) or on the image below to go to the YouTube video<p>
+[![Path Planning Track Ride](https://img.youtube.com/vi/FjcHx42kIEs/0.jpg)](https://youtu.be/FjcHx42kIEs)
+   
+### Introduction
+
+This is a lap run for Udacity Self-Driving-Car NanoDegree Path Planning Project using Unity simulator.
+
+In order to make a successful run the car needs to obey the traffic rules, stay on the right hand side of the road whenever possible, do not exceed the speed limit of 50mph, do not collide with other cars and remain at safe distance from them as well as ride comfortable meaning keep a low jerk and acceleration (positive and breaking) for the comfort of passengers. This is fully achieved in the final delivery and in the YouTube video of the ride.
+
+### Behavior Planning Methodology
+
+Methodology used for this implementation is a simple machine state implemented through a decision tree algorithm which in its nodes checks in which lane the car is, if there are cars in front or close behind it and finally the time spend in each lane to not jump two lanes at once. Based on those nodes the car makes a decision of whether to stay in the lane and keep driving at constant speed, slow down due to oncoming traffic or perhaps overtake the car ahead if there is available space to perform such manouver.
+
+<b>Note:</b> traffic rules are Straßenverkehrsordnung (StVO) which are German highway driving rules such as keep on the right when possible and to prioritize overtaking cars on the left.
+
+### Trajectory Methodology
+
+Given the input from the Behavior Planning part of the code the trajectory is calculated based waypoints from the current to the desired position. Then the path is smoothened using spline.h and tk::spline method and also taking into account historic path data to not make any obrupt changes in the trajectory. This method is based on the walkt-through from the Udacity lectures although some hyperparameter changes are applied for better suitability to the behavior planning module.
    
 ### Simulator.
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases).
@@ -138,3 +160,4 @@ still be compilable with cmake and make./
 ## How to write a README
 A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
 
+![alt tex](https://github.com/Kamil-K/CarND-Path-Planning-Project/blob/master/pics/Screenshot.PNG "Successful Run")
